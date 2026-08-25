@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const { FieldValue } = require('firebase-admin/firestore');
 const db = require('./config/firebase');
+const razorpay = require('./config/razorpay');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -33,6 +34,34 @@ app.get('/health/firestore', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+app.get('/health/razorpay', async (req, res) => {
+  try {
+    const paymentLink = await razorpay.paymentLink.create({
+      amount: 100,
+      currency: 'INR',
+      description: 'Halt Line integration test - safe to ignore',
+      customer: {
+        name: 'Test Customer',
+        email: 'test@example.com',
+        contact: '9123456780',
+      },
+      notify: {
+        sms: false,
+        email: false,
+      },
+    });
+
+    res.status(200).json({
+      status: 'ok',
+      paymentLinkId: paymentLink.id,
+      shortUrl: paymentLink.short_url,
+    });
+  } catch (error) {
+    const message = error.error?.description || error.message || 'Unknown Razorpay error';
+    res.status(500).json({ status: 'error', message });
   }
 });
 
