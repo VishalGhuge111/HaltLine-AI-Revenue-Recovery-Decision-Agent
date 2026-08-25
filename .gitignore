@@ -8,3 +8,4 @@ client/build/
 server/dist/
 firebase-debug.log
 .firebase/
+server/firebase-service-account.json
