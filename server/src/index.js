@@ -7,6 +7,7 @@ const { FieldValue } = require('firebase-admin/firestore');
 const db = require('./config/firebase');
 const razorpay = require('./config/razorpay');
 const razorpayWebhookRouter = require('./webhooks/razorpayWebhook');
+const dashboardRouter = require('./routes/dashboardRoutes');
 // TEST HARNESS ONLY - see src/testHarness/testHarnessRouter.js. Not part of
 // the product's locked core loop.
 const testHarnessRouter = require('./testHarness/testHarnessRouter');
@@ -31,6 +32,8 @@ app.use('/webhooks/razorpay', express.raw({ type: '*/*' }));
 app.use(express.json());
 
 app.use('/webhooks/razorpay', razorpayWebhookRouter);
+
+app.use('/api', dashboardRouter);
 
 // TEST HARNESS ONLY - not part of product architecture. Scoped to public/ so
 // only files intentionally placed there are ever served (never .env, never
