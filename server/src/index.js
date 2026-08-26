@@ -1,11 +1,15 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const { FieldValue } = require('firebase-admin/firestore');
 const db = require('./config/firebase');
 const razorpay = require('./config/razorpay');
 const razorpayWebhookRouter = require('./webhooks/razorpayWebhook');
+// TEST HARNESS ONLY - see src/testHarness/testHarnessRouter.js. Not part of
+// the product's locked core loop.
+const testHarnessRouter = require('./testHarness/testHarnessRouter');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -27,6 +31,12 @@ app.use('/webhooks/razorpay', express.raw({ type: '*/*' }));
 app.use(express.json());
 
 app.use('/webhooks/razorpay', razorpayWebhookRouter);
+
+// TEST HARNESS ONLY - not part of product architecture. Scoped to public/ so
+// only files intentionally placed there are ever served (never .env, never
+// the service account key sitting elsewhere in server/).
+app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use('/test-harness', testHarnessRouter);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', service: 'halt-line-server' });

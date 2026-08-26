@@ -41,18 +41,32 @@ const NON_RETRIABLE_REASONS = new Set([
   'international_transaction_not_allowed',
 ]);
 
-// 'payment_failed' is deliberately NOT in either set above. It's a generic
-// gateway failure reason with no further detail - too vague to classify with
-// any confidence, so it falls through to UNCERTAIN like any other undocumented
-// or ambiguous reason.
+// 'payment_failed' is NOT in either set above - it's a generic reason with no
+// further detail, so on its own it's too vague to classify with confidence
+// and falls through to UNCERTAIN like any other undocumented or ambiguous
+// reason. The one exception is errorSource "gateway" specifically, handled
+// below: an unspecified gateway failure with no more specific decline reason
+// is treated as a soft decline eligible for retry, consistent with standard
+// dunning/recovery practice - a payment gateway returning a generic failure
+// without flagging fraud, an expired card, or another structural issue gives
+// no reason to believe a retry won't succeed. Specific hard-decline reasons
+// (card_expired, payment_risk_check_failed, international_transaction_not_allowed,
+// etc.) remain correctly classified as NON_RETRIABLE regardless of this change -
+// this only affects the source+reason combination of gateway + payment_failed.
 
 // errorSource is accepted as a secondary, corroborating signal only (e.g.
 // "business" alongside international_transaction_not_allowed confirms a
 // merchant-config issue rather than a bank decline). It never overrides or
 // extends the reason-based outcome above, and is never used to guess a
-// classification for a reason outside the documented sets.
+// classification for a reason outside the documented sets - except the single
+// gateway+payment_failed case documented above.
 function classifyFailure(errorSource, errorReason) {
+  const source = (errorSource || '').toLowerCase();
   const reason = (errorReason || '').toLowerCase();
+
+  if (reason === 'payment_failed' && source === 'gateway') {
+    return 'RETRIABLE';
+  }
 
   if (RETRIABLE_REASONS.has(reason)) {
     return 'RETRIABLE';

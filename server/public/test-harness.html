@@ -1,0 +1,69 @@
+<!-- TEST HARNESS ONLY - not part of product architecture. Dev tool to trigger
+     real Razorpay Custom Checkout payments so specific test cards produce
+     specific error_reason values, for exercising RETRIABLE/NON_RETRIABLE
+     classification paths. Not demo-facing, not part of the locked core loop. -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Halt Line - Test Harness (not product UI)</title>
+</head>
+<body>
+  <h3>TEST HARNESS ONLY - not part of Halt Line's product</h3>
+  <p>Creates a real Razorpay Order and opens Custom Checkout so a specific test card can produce a specific error_reason.</p>
+
+  <label>Amount (paise): <input id="amount" type="number" value="100" /></label>
+  <button id="pay-btn">Create Order &amp; Pay</button>
+  <pre id="log"></pre>
+
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    function log(msg) {
+      document.getElementById('log').textContent += msg + '\n';
+    }
+
+    document.getElementById('pay-btn').addEventListener('click', async () => {
+      const amount = Number(document.getElementById('amount').value) || 100;
+      log('Creating order for amount=' + amount + '...');
+
+      const res = await fetch('/test-harness/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, currency: 'INR' }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        log('Order creation failed: ' + (err.message || res.status));
+        return;
+      }
+
+      const { orderId, keyId, amount: orderAmount, currency } = await res.json();
+      log('Order created: ' + orderId + ' (key: ' + keyId + ')');
+
+      const rzp = new Razorpay({
+        key: keyId,
+        order_id: orderId,
+        amount: orderAmount,
+        currency: currency,
+        name: 'Halt Line Test Harness',
+        description: 'Test harness order - not a real charge',
+        handler: function (response) {
+          log('Checkout handler fired: ' + JSON.stringify(response));
+        },
+        modal: {
+          ondismiss: function () {
+            log('Checkout modal dismissed.');
+          },
+        },
+      });
+
+      rzp.on('payment.failed', function (response) {
+        log('payment.failed event: ' + JSON.stringify(response.error));
+      });
+
+      rzp.open();
+    });
+  </script>
+</body>
+</html>
