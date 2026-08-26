@@ -5,12 +5,28 @@ require('dotenv').config();
 const { FieldValue } = require('firebase-admin/firestore');
 const db = require('./config/firebase');
 const razorpay = require('./config/razorpay');
+const razorpayWebhookRouter = require('./webhooks/razorpayWebhook');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 app.use(cors());
+
+// Must be registered before express.json() below: Razorpay's HMAC signature
+// is computed over the exact raw request bytes, which express.json() would
+// otherwise consume and reparse. Once express.raw() has fully read the
+// request stream, body-parser's internal onFinished(req) check is true, so
+// express.json() no-ops for this path - every other route is unaffected.
+app.use('/webhooks/razorpay', express.raw({ type: '*/*' }));
+
 app.use(express.json());
+
+app.use('/webhooks/razorpay', razorpayWebhookRouter);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', service: 'halt-line-server' });
