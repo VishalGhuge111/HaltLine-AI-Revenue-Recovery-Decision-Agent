@@ -1,0 +1,138 @@
+const { z } = require('zod');
+const { zodOutputFormat } = require('@anthropic-ai/sdk/helpers/zod');
+const { FieldValue } = require('firebase-admin/firestore');
+const anthropic = require('../config/anthropic');
+const db = require('../config/firebase');
+const { logAuditEvent } = require('../services/auditLog');
+
+const MODEL = 'claude-opus-5';
+
+const ProposalSchema = z.object({
+  classification: z.enum(['RETRIABLE', 'NON_RETRIABLE', 'UNCERTAIN']),
+  confidence: z.number().min(0).max(1),
+  proposed_action: z.enum(['SEND_RECOVERY_LINK', 'NO_ACTION_RECOMMENDED', 'ESCALATE_TO_HUMAN']),
+  reasoning: z.string(),
+  customer_message: z.string(),
+});
+
+const SYSTEM_PROMPT = `You are the AI proposal generator for the Halt Line payment recovery system.
+
+You are a proposal-only system. You have no authority to execute payments or actions. A separate policy system will decide whether to act on your proposal.
+
+You will be given a payment failure case that has already been deterministically classified upstream (RETRIABLE, NON_RETRIABLE, or UNCERTAIN). Echo that classification back exactly as given - you must not re-classify the case, that is not your job. Your job is to propose one recovery action, with a confidence score and a brief internal reasoning, plus a draft customer-facing message.
+
+Guidance for proposed_action (a hint, not a hard rule - use judgment on the actual case):
+- RETRIABLE cases generally warrant SEND_RECOVERY_LINK.
+- NON_RETRIABLE cases generally warrant NO_ACTION_RECOMMENDED or ESCALATE_TO_HUMAN, depending on severity (e.g. suspected fraud or another high-risk decline should escalate rather than close out silently).
+- UNCERTAIN cases generally warrant ESCALATE_TO_HUMAN.
+
+Hard wording constraints for customer_message (keep reasoning clean of these too):
+- When describing what the customer can do, use the concept of "recover the outstanding revenue" - never use the phrases "settle the invoice" or "reactivate the subscription".
+- Never claim or imply NPCI or RBI compliance, anywhere in your output. If you need compliance-adjacent language at all, say "merchant-configured policy" instead.
+- Never describe a synthetic or test amount as "real revenue recovered".
+
+Keep customer_message short and professional - it is only a draft that a human reviews before anything is sent, never sent automatically. Keep reasoning to 1-3 sentences; it is for internal audit review only and is never shown to the customer.`;
+
+// Defense in depth: schema enforcement guarantees structure, not wording. These
+// are the exact phrases the project spec bans from customer_message/reasoning,
+// plus "real revenue recovered" to cover the spec's third wording rule (never
+// call a synthetic/test amount real revenue recovered).
+const BANNED_PHRASES = [
+  'settle the invoice',
+  'reactivate the subscription',
+  'RBI',
+  'NPCI',
+  'compliant',
+  'compliance',
+  'real revenue recovered',
+];
+
+function findBannedPhrase(proposal) {
+  const fields = { customer_message: proposal.customer_message, reasoning: proposal.reasoning };
+  for (const [field, text] of Object.entries(fields)) {
+    const lower = text.toLowerCase();
+    for (const phrase of BANNED_PHRASES) {
+      if (lower.includes(phrase.toLowerCase())) {
+        return { field, phrase };
+      }
+    }
+  }
+  return null;
+}
+
+function buildUserPrompt(revenueCase) {
+  const { classification, errorSource, errorReason, amount, currency, customerContact, customerEmail } =
+    revenueCase;
+
+  return `Payment failure case:
+- classification (already determined upstream, do not change): ${classification}
+- errorSource: ${errorSource}
+- errorReason: ${errorReason}
+- amount: ${amount} ${currency}
+- customerContact: ${customerContact}
+- customerEmail: ${customerEmail}
+
+Propose one recovery action for this case.`;
+}
+
+async function proposeRecoveryAction(revenueCase) {
+  const { caseId } = revenueCase;
+
+  let response;
+  try {
+    response = await anthropic.messages.parse({
+      model: MODEL,
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: buildUserPrompt(revenueCase) }],
+      output_config: { format: zodOutputFormat(ProposalSchema) },
+    });
+  } catch (error) {
+    await logAuditEvent(caseId, 'ai_proposal_failed', {
+      error: error.message,
+      name: error.name,
+    });
+    throw error;
+  }
+
+  if (!response.parsed_output) {
+    const error = new Error(
+      `Anthropic response could not be parsed into the proposal schema (stop_reason: ${response.stop_reason})`,
+    );
+    await logAuditEvent(caseId, 'ai_proposal_failed', {
+      error: error.message,
+      stopReason: response.stop_reason,
+    });
+    throw error;
+  }
+
+  const proposal = response.parsed_output;
+
+  const violation = findBannedPhrase(proposal);
+  if (violation) {
+    await logAuditEvent(caseId, 'ai_proposal_wording_violation', {
+      phrase: violation.phrase,
+      field: violation.field,
+    });
+    throw new Error(`AI proposal contains banned phrase "${violation.phrase}" in ${violation.field}`);
+  }
+
+  await logAuditEvent(caseId, 'ai_proposal_generated', {
+    classification: proposal.classification,
+    confidence: proposal.confidence,
+    proposed_action: proposal.proposed_action,
+  });
+
+  await db
+    .collection('ai_proposals')
+    .doc(caseId)
+    .set({
+      caseId,
+      ...proposal,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+  return proposal;
+}
+
+module.exports = { proposeRecoveryAction };
