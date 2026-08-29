@@ -8,6 +8,7 @@ const db = require('./config/firebase');
 const razorpay = require('./config/razorpay');
 const razorpayWebhookRouter = require('./webhooks/razorpayWebhook');
 const dashboardRouter = require('./routes/dashboardRoutes');
+const simulationRouter = require('./routes/simulationRoutes');
 // TEST HARNESS ONLY - see src/testHarness/testHarnessRouter.js. Not part of
 // the product's locked core loop.
 const testHarnessRouter = require('./testHarness/testHarnessRouter');
@@ -34,6 +35,7 @@ app.use(express.json());
 app.use('/webhooks/razorpay', razorpayWebhookRouter);
 
 app.use('/api', dashboardRouter);
+app.use('/api', simulationRouter);
 
 // TEST HARNESS ONLY - not part of product architecture. Scoped to public/ so
 // only files intentionally placed there are ever served (never .env, never

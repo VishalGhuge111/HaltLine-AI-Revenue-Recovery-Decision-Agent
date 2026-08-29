@@ -50,7 +50,15 @@ export function Header() {
             OPS
           </span>
         </Link>
-        <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Revenue recovery — case review</span>
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <Link to="/" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-secondary)' }}>
+            Cases
+          </Link>
+          <Link to="/simulations" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-secondary)' }}>
+            Simulations
+          </Link>
+          <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Revenue recovery — case review</span>
+        </nav>
       </div>
     </header>
   );
