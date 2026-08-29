@@ -76,3 +76,33 @@ export function ClassificationBadge({ classification }) {
     </span>
   );
 }
+
+const RECOVERY_STATUS_STYLES = {
+  active: { color: 'var(--accent-policy)', bg: 'var(--accent-policy-bg)', border: 'var(--accent-policy-border)', label: 'Active' },
+  paid: { color: 'var(--approve)', bg: 'var(--approve-bg)', border: 'var(--approve-border)', label: 'Paid' },
+  expired: { color: 'var(--neutral-status)', bg: 'var(--neutral-status-bg)', border: 'var(--neutral-status-border)', label: 'Expired' },
+};
+
+export function RecoveryStatusBadge({ status }) {
+  const style = RECOVERY_STATUS_STYLES[status] || RECOVERY_STATUS_STYLES.expired;
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        fontSize: 12,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.03em',
+        color: style.color,
+        background: style.bg,
+        border: `1px solid ${style.border}`,
+        borderRadius: 999,
+        padding: '3px 10px',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {style.label}
+    </span>
+  );
+}

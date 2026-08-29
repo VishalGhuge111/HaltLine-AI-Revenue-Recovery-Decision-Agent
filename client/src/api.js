@@ -15,6 +15,14 @@ export function fetchCaseDetail(caseId) {
   return request(`/cases/${encodeURIComponent(caseId)}`);
 }
 
+export function fetchPaymentLinks() {
+  return request('/payment-links').then((body) => body.paymentLinks);
+}
+
+export function fetchAuditTrail() {
+  return request('/audit-trail').then((body) => body.events);
+}
+
 export function runSimulation(n) {
   return request('/simulations/run', {
     method: 'POST',

@@ -104,4 +104,57 @@ router.get('/cases/:caseId', async (req, res) => {
   }
 });
 
+router.get('/payment-links', async (req, res) => {
+  try {
+    const snap = await db.collection('recovery_attempts').orderBy('createdAt', 'desc').get();
+
+    const paymentLinks = await Promise.all(
+      snap.docs.map(async (doc) => {
+        const data = doc.data();
+        const caseDoc = await db.collection('revenue_cases').doc(data.caseId).get();
+        const caseData = caseDoc.exists ? caseDoc.data() : null;
+
+        return {
+          paymentLinkId: doc.id,
+          caseId: data.caseId,
+          shortUrl: data.shortUrl,
+          status: data.status,
+          amount: caseData ? caseData.amount : null,
+          currency: caseData ? caseData.currency : null,
+          createdAt: toIso(data.createdAt),
+          expiresAt: toIso(data.expiresAt),
+          paidAt: toIso(data.paidAt),
+        };
+      }),
+    );
+
+    res.status(200).json({ status: 'ok', paymentLinks });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+router.get('/audit-trail', async (req, res) => {
+  try {
+    // A flat limit is sufficient for this demo; pagination would be needed at
+    // real scale.
+    const snap = await db.collection('audit_trail').orderBy('timestamp', 'desc').limit(200).get();
+
+    const events = snap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        eventId: doc.id,
+        caseId: data.caseId,
+        step: data.step,
+        details: data.details,
+        timestamp: toIso(data.timestamp),
+      };
+    });
+
+    res.status(200).json({ status: 'ok', events });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 module.exports = router;

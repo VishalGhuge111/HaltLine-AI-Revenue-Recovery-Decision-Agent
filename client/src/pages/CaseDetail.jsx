@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { fetchCaseDetail } from '../api';
-import { DecisionBadge, ClassificationBadge } from '../components/StatusBadge';
+import { DecisionBadge, ClassificationBadge, RecoveryStatusBadge } from '../components/StatusBadge';
 import { ConfidenceMeter } from '../components/ConfidenceMeter';
 import { RulesChecklist, RULE_LABELS } from '../components/RulesChecklist';
 import { AuditTimeline } from '../components/AuditTimeline';
@@ -12,12 +12,6 @@ const AI_ACTION_LABELS = {
   SEND_RECOVERY_LINK: 'Send recovery link',
   NO_ACTION_RECOMMENDED: 'No action recommended',
   ESCALATE_TO_HUMAN: 'Escalate to human',
-};
-
-const RECOVERY_STATUS_STYLES = {
-  active: { color: 'var(--accent-policy)', bg: 'var(--accent-policy-bg)', border: 'var(--accent-policy-border)' },
-  paid: { color: 'var(--approve)', bg: 'var(--approve-bg)', border: 'var(--approve-border)' },
-  expired: { color: 'var(--neutral-status)', bg: 'var(--neutral-status-bg)', border: 'var(--neutral-status-border)' },
 };
 
 function impliesAgreement(aiAction, decision) {
@@ -289,7 +283,6 @@ export function CaseDetail() {
       {recoveryAttempts && recoveryAttempts.length > 0 && (
         <Panel title="Recovery attempt" eyebrow="Executed action" style={{ marginBottom: 20 }}>
           {recoveryAttempts.map((attempt) => {
-            const statusStyle = RECOVERY_STATUS_STYLES[attempt.status] || RECOVERY_STATUS_STYLES.expired;
             return (
               <div
                 key={attempt.paymentLinkId}
@@ -303,21 +296,7 @@ export function CaseDetail() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.03em',
-                      color: statusStyle.color,
-                      background: statusStyle.bg,
-                      border: `1px solid ${statusStyle.border}`,
-                      borderRadius: 999,
-                      padding: '3px 10px',
-                    }}
-                  >
-                    {attempt.status}
-                  </span>
+                  <RecoveryStatusBadge status={attempt.status} />
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)' }}>
                     {attempt.paymentLinkId}
                   </span>
@@ -363,7 +342,7 @@ export function CaseDetail() {
 function BackLink() {
   return (
     <Link
-      to="/"
+      to="/cases"
       style={{
         display: 'inline-flex',
         alignItems: 'center',
