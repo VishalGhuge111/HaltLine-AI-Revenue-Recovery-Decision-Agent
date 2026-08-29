@@ -6,13 +6,7 @@ import { ConfidenceMeter } from '../components/ConfidenceMeter';
 import { RulesChecklist, RULE_LABELS } from '../components/RulesChecklist';
 import { AuditTimeline } from '../components/AuditTimeline';
 import { Panel } from '../components/Panel';
-import { formatAmount, formatDateTime, formatSnakeCase } from '../format';
-
-const AI_ACTION_LABELS = {
-  SEND_RECOVERY_LINK: 'Send recovery link',
-  NO_ACTION_RECOMMENDED: 'No action recommended',
-  ESCALATE_TO_HUMAN: 'Escalate to human',
-};
+import { formatAmount, formatDateTime, formatSnakeCase, AI_ACTION_LABELS } from '../format';
 
 function impliesAgreement(aiAction, decision) {
   if (aiAction === 'SEND_RECOVERY_LINK') return decision === 'APPROVE';

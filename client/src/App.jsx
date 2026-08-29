@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import { Sidebar, SIDEBAR_WIDTH } from './components/Sidebar';
+import { LiveDemo } from './pages/LiveDemo';
 import { Overview } from './pages/Overview';
 import { CaseList } from './pages/CaseList';
 import { CaseDetail } from './pages/CaseDetail';
@@ -15,6 +16,7 @@ export default function App() {
       <Sidebar />
       <main style={{ marginLeft: SIDEBAR_WIDTH, minHeight: '100vh' }}>
         <Routes>
+          <Route path="/live-demo" element={<LiveDemo />} />
           <Route path="/" element={<Overview />} />
           <Route path="/cases" element={<CaseList />} />
           <Route path="/case/:caseId" element={<CaseDetail />} />

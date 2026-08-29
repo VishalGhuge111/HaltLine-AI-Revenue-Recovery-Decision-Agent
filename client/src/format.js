@@ -45,6 +45,12 @@ export function shortenId(id, keep = 6) {
   return `${id.slice(0, 4)}…${id.slice(-keep)}`;
 }
 
+export const AI_ACTION_LABELS = {
+  SEND_RECOVERY_LINK: 'Send recovery link',
+  NO_ACTION_RECOMMENDED: 'No action recommended',
+  ESCALATE_TO_HUMAN: 'Escalate to human',
+};
+
 export function formatSnakeCase(value) {
   if (!value) return '—';
   return value

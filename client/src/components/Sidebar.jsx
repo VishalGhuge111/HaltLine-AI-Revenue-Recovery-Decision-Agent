@@ -21,6 +21,12 @@ function Icon({ children }) {
 }
 
 const ICONS = {
+  liveDemo: (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 8.3l6 3.7-6 3.7V8.3z" fill="currentColor" stroke="none" />
+    </Icon>
+  ),
   overview: (
     <Icon>
       <rect x="3" y="3" width="7.5" height="9" rx="1.5" />
@@ -65,6 +71,7 @@ const ICONS = {
 };
 
 const NAV_ITEMS = [
+  { to: '/live-demo', label: 'Live Demo', icon: 'liveDemo' },
   { to: '/', label: 'Overview', icon: 'overview', end: true },
   { to: '/cases', label: 'Revenue Cases', icon: 'cases' },
   { to: '/payment-links', label: 'Payment Links', icon: 'paymentLinks' },
