@@ -7,6 +7,8 @@ const { createRevenueCase } = require('../models/RevenueCase');
 const { logAuditEvent } = require('../services/auditLog');
 const { proposeRecoveryAction } = require('../ai/proposeRecoveryAction');
 const { evaluateProposal } = require('../policy/evaluateProposal');
+const { getSettings } = require('../config/settings');
+const { sendRecoveryEmail } = require('../services/sendRecoveryEmail');
 
 const router = express.Router();
 
@@ -56,7 +58,7 @@ async function checkAndMarkProcessed(eventId, eventType) {
 // recovery_attempts tracking doc, and logs each step. Never throws - a
 // downstream Razorpay failure here is logged as payment_link_creation_failed
 // rather than crashing the webhook response.
-async function executeApprovedRecovery(revenueCase) {
+async function executeApprovedRecovery(revenueCase, aiProposal) {
   const expireBy = Math.floor(Date.now() / 1000) + RECOVERY_LINK_VALIDITY_SECONDS;
 
   let paymentLink;
@@ -82,6 +84,16 @@ async function executeApprovedRecovery(revenueCase) {
     paymentLinkId: paymentLink.id,
     shortUrl: paymentLink.short_url,
   });
+
+  const settings = await getSettings();
+  if (settings.autoSendEmail) {
+    try {
+      await sendRecoveryEmail(revenueCase, aiProposal, paymentLink.short_url);
+    } catch (error) {
+      // sendRecoveryEmail already logs recovery_email_failed to audit_trail;
+      // an email failure must never break the webhook response.
+    }
+  }
 
   await db
     .collection('recovery_attempts')
@@ -117,7 +129,7 @@ async function runRecoveryPipeline(revenueCase) {
   // policy_decision_made internally.
 
   if (decision.decision === 'APPROVE') {
-    await executeApprovedRecovery(revenueCase);
+    await executeApprovedRecovery(revenueCase, aiProposal);
     return;
   }
 

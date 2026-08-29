@@ -108,6 +108,7 @@ export function LiveDemo() {
         currency: createdOrder.currency,
         name: 'Halt Line',
         description: 'Live demo order - Test Mode, not a real charge',
+        prefill: createdOrder.contact ? { contact: createdOrder.contact } : undefined,
         handler: function () {
           startPolling();
         },
@@ -217,6 +218,12 @@ export function LiveDemo() {
           >
             Order created: <strong style={{ fontFamily: 'var(--font-mono)' }}>{order.orderId}</strong>. Complete the
             checkout in the popup, then click "Check Latest Case" below once done.
+            {order.contact && (
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                Prefilled test contact: <span style={{ fontFamily: 'var(--font-mono)' }}>{order.contact}</span>{' '}
+                (fresh per order, so the frequency-cap rule won't fire artificially)
+              </div>
+            )}
           </div>
         )}
       </div>

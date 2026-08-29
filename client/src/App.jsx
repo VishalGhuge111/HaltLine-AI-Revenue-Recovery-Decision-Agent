@@ -9,6 +9,7 @@ import { Recoveries } from './pages/Recoveries';
 import { AuditTrailPage } from './pages/AuditTrailPage';
 import { Simulations } from './pages/Simulations';
 import { Policies } from './pages/Policies';
+import { Settings } from './pages/Settings';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/audit-trail" element={<AuditTrailPage />} />
           <Route path="/simulations" element={<Simulations />} />
           <Route path="/policies" element={<Policies />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
     </div>

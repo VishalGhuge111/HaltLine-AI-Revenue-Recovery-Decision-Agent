@@ -68,6 +68,12 @@ const ICONS = {
       <path d="M12 3l7.5 3v6c0 4.7-3.2 8-7.5 9-4.3-1-7.5-4.3-7.5-9V6l7.5-3z" />
     </Icon>
   ),
+  settings: (
+    <Icon>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 3.5v2.4M12 18.1v2.4M20.5 12h-2.4M5.9 12H3.5M17.7 6.3l-1.7 1.7M8 16l-1.7 1.7M17.7 17.7L16 16M8 8L6.3 6.3" />
+    </Icon>
+  ),
 };
 
 const NAV_ITEMS = [
@@ -79,6 +85,7 @@ const NAV_ITEMS = [
   { to: '/audit-trail', label: 'Audit Trail', icon: 'auditTrail' },
   { to: '/simulations', label: 'Simulations', icon: 'simulations' },
   { to: '/policies', label: 'Policies', icon: 'policies' },
+  { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
 export function Sidebar() {

@@ -64,11 +64,16 @@ function buildUserPrompt(revenueCase) {
   const { classification, errorSource, errorReason, amount, currency, customerContact, customerEmail } =
     revenueCase;
 
+  // amount is stored in paise (Razorpay's convention) - convert to a decimal
+  // display amount here so the AI's drafted customer_message quotes the real
+  // amount (e.g. "1.00 INR") rather than the raw paise integer (e.g. "100 INR").
+  const displayAmount = `${((amount || 0) / 100).toFixed(2)} ${currency}`;
+
   return `Payment failure case:
 - classification (already determined upstream, do not change): ${classification}
 - errorSource: ${errorSource}
 - errorReason: ${errorReason}
-- amount: ${amount} ${currency}
+- amount: ${displayAmount}
 - customerContact: ${customerContact}
 - customerEmail: ${customerEmail}
 
@@ -107,6 +112,18 @@ async function proposeRecoveryAction(revenueCase) {
   }
 
   const proposal = response.parsed_output;
+
+  // Schema enforcement guarantees customer_message is a string, not that it's
+  // non-empty - z.string() accepts "". A blank draft is a genuine generation
+  // failure (seen in practice on a low-confidence case) and must surface as
+  // one rather than silently sending an empty message to a customer.
+  if (!proposal.customer_message || proposal.customer_message.trim().length === 0) {
+    await logAuditEvent(caseId, 'ai_proposal_empty_message', {
+      classification: proposal.classification,
+      confidence: proposal.confidence,
+    });
+    throw new Error('AI proposal returned an empty customer_message');
+  }
 
   const violation = findBannedPhrase(proposal);
   if (violation) {

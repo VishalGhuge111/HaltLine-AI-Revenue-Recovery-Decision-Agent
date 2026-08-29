@@ -38,3 +38,19 @@ export function fetchSimulations() {
 export function fetchSimulationDetail(batchId) {
   return request(`/simulations/${encodeURIComponent(batchId)}`).then((body) => body.simulation);
 }
+
+export function fetchSettings() {
+  return request('/settings').then((body) => body.settings);
+}
+
+export function saveSettings(partial) {
+  return request('/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(partial),
+  }).then((body) => body.settings);
+}
+
+export function sendCaseEmail(caseId) {
+  return request(`/cases/${encodeURIComponent(caseId)}/send-email`, { method: 'POST' });
+}

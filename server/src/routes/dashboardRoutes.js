@@ -1,11 +1,14 @@
 const express = require('express');
 const db = require('../config/firebase');
+const { sendRecoveryEmail } = require('../services/sendRecoveryEmail');
 
 const router = express.Router();
 
-// Read-only. No writes, no mutation of any kind - this route group exists
-// purely to surface existing Firestore state (revenue_cases, ai_proposals,
-// policy_decisions, recovery_attempts, audit_trail) for the dashboard.
+// Mostly read-only: this route group exists to surface existing Firestore
+// state (revenue_cases, ai_proposals, policy_decisions, recovery_attempts,
+// audit_trail) for the dashboard. The one exception is POST
+// /cases/:caseId/send-email below, which triggers a real side effect
+// (sending an email) on demand.
 
 function toIso(value) {
   if (!value) return null;
@@ -99,6 +102,35 @@ router.get('/cases/:caseId', async (req, res) => {
         })
         .sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || '')),
     });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+router.post('/cases/:caseId/send-email', async (req, res) => {
+  try {
+    const { caseId } = req.params;
+
+    const [caseDoc, proposalDoc, recoveryAttemptsSnap] = await Promise.all([
+      db.collection('revenue_cases').doc(caseId).get(),
+      db.collection('ai_proposals').doc(caseId).get(),
+      db.collection('recovery_attempts').where('caseId', '==', caseId).get(),
+    ]);
+
+    if (!caseDoc.exists) {
+      return res.status(404).json({ status: 'error', message: 'Case not found' });
+    }
+    if (!proposalDoc.exists) {
+      return res.status(400).json({ status: 'error', message: 'No AI proposal exists for this case' });
+    }
+
+    // Most recently created recovery attempt is the live link for this case.
+    const [latestAttempt] = recoveryAttemptsSnap.docs
+      .map((doc) => doc.data())
+      .sort((a, b) => (toIso(b.createdAt) || '').localeCompare(toIso(a.createdAt) || ''));
+
+    const result = await sendRecoveryEmail(caseDoc.data(), proposalDoc.data(), latestAttempt?.shortUrl || null);
+    res.status(200).json({ status: 'ok', ...result });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }

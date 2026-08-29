@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { fetchCaseDetail } from '../api';
+import { fetchCaseDetail, sendCaseEmail } from '../api';
 import { DecisionBadge, ClassificationBadge, RecoveryStatusBadge } from '../components/StatusBadge';
 import { ConfidenceMeter } from '../components/ConfidenceMeter';
 import { RulesChecklist, RULE_LABELS } from '../components/RulesChecklist';
@@ -48,6 +48,8 @@ export function CaseDetail() {
   const { caseId } = useParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailResult, setEmailResult] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +66,22 @@ export function CaseDetail() {
       cancelled = true;
     };
   }, [caseId]);
+
+  async function handleSendEmail() {
+    setSendingEmail(true);
+    setEmailResult(null);
+    try {
+      const result = await sendCaseEmail(caseId);
+      setEmailResult({
+        type: 'success',
+        message: `Email sent to ${result.recipient}. Refresh to see the new audit trail entry.`,
+      });
+    } catch (err) {
+      setEmailResult({ type: 'error', message: err.message });
+    } finally {
+      setSendingEmail(false);
+    }
+  }
 
   if (error) {
     return (
@@ -275,7 +293,47 @@ export function CaseDetail() {
 
       {/* Recovery attempt */}
       {recoveryAttempts && recoveryAttempts.length > 0 && (
-        <Panel title="Recovery attempt" eyebrow="Executed action" style={{ marginBottom: 20 }}>
+        <Panel
+          title="Recovery attempt"
+          eyebrow="Executed action"
+          style={{ marginBottom: 20 }}
+          right={
+            policyDecision?.decision === 'APPROVE' && (
+              <button
+                onClick={handleSendEmail}
+                disabled={sendingEmail}
+                style={{
+                  padding: '8px 14px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#fff',
+                  background: sendingEmail ? 'var(--text-tertiary)' : '#17171a',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: sendingEmail ? 'default' : 'pointer',
+                }}
+              >
+                {sendingEmail ? 'Sending…' : 'Send Recovery Email'}
+              </button>
+            )
+          }
+        >
+          {emailResult && (
+            <div
+              style={{
+                marginBottom: 14,
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 13,
+                fontWeight: 500,
+                ...(emailResult.type === 'success'
+                  ? { background: 'var(--approve-bg)', color: 'var(--approve)', border: '1px solid var(--approve-border)' }
+                  : { background: 'var(--veto-bg)', color: 'var(--veto)', border: '1px solid var(--veto-border)' }),
+              }}
+            >
+              {emailResult.message}
+            </div>
+          )}
           {recoveryAttempts.map((attempt) => {
             return (
               <div
