@@ -3,12 +3,12 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
-const { FieldValue } = require('firebase-admin/firestore');
 const db = require('./config/firebase');
 const razorpay = require('./config/razorpay');
 const razorpayWebhookRouter = require('./webhooks/razorpayWebhook');
 const dashboardRouter = require('./routes/dashboardRoutes');
 const simulationRouter = require('./routes/simulationRoutes');
+const settingsRouter = require('./routes/settingsRoutes');
 // TEST HARNESS ONLY - see src/testHarness/testHarnessRouter.js. Not part of
 // the product's locked core loop.
 const testHarnessRouter = require('./testHarness/testHarnessRouter');
@@ -36,6 +36,7 @@ app.use('/webhooks/razorpay', razorpayWebhookRouter);
 
 app.use('/api', dashboardRouter);
 app.use('/api', simulationRouter);
+app.use('/api', settingsRouter);
 
 // TEST HARNESS ONLY - not part of product architecture. Scoped to public/ so
 // only files intentionally placed there are ever served (never .env, never
@@ -49,22 +50,19 @@ app.get('/health', (req, res) => {
 
 app.get('/health/firestore', async (req, res) => {
   try {
-    const docRef = db.collection('_healthchecks').doc();
-    await docRef.set({
-      timestamp: FieldValue.serverTimestamp(),
-      status: 'ok',
-    });
-
-    const snapshot = await docRef.get();
+    // Read-only connectivity check: listing root collections round-trips to
+    // Firestore and fails if the client can't authenticate or reach the DB,
+    // without writing anything. (Previously this wrote a throwaway doc to a
+    // _healthchecks collection on every hit - removed to keep the DB clean.)
+    const collections = await db.listCollections();
 
     res.status(200).json({
       status: 'ok',
-      firestoreWrite: true,
-      firestoreRead: snapshot.exists,
-      docId: docRef.id,
+      firestoreConnected: true,
+      collectionsVisible: collections.length,
     });
   } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
+    res.status(500).json({ status: 'error', firestoreConnected: false, message: error.message });
   }
 });
 
