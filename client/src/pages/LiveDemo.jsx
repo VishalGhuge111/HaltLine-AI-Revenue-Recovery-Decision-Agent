@@ -1,3 +1,15 @@
+// DEV/DEMO-ONLY TOOLING - not part of the product's real customer-facing
+// surface. This page (and its "Live Demo" entry in the Sidebar nav) drives
+// Razorpay's Custom Checkout purely to reliably trigger a Test Mode payment
+// failure for demos. The actual product only ever creates Payment Links, never
+// embeds checkout.
+//
+// It depends on the backend test harness, which is mounted only when the server
+// has ENABLE_TEST_HARNESS=true set. With that flag unset (the real-deployment
+// default), POST /test-harness/create-order returns 404 and "Create Order &
+// Trigger Checkout" below will just surface an error - expected, since this
+// page is not meant to ship enabled. The note at the bottom of the page states
+// the same thing for anyone viewing it in the UI.
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchCases, fetchCaseDetail } from '../api';

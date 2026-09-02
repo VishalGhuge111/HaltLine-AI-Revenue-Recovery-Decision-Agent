@@ -77,6 +77,11 @@ const ICONS = {
 };
 
 const NAV_ITEMS = [
+  // DEV/DEMO-ONLY. The Live Demo page drives Razorpay Custom Checkout via the
+  // backend test harness (mounted only when the server has ENABLE_TEST_HARNESS
+  // =true). It is not part of the product's real customer-facing surface - with
+  // the harness disabled the page only surfaces errors. Consider dropping this
+  // nav entry (and the /live-demo route) from any real deployment build.
   { to: '/live-demo', label: 'Live Demo', icon: 'liveDemo' },
   { to: '/', label: 'Overview', icon: 'overview', end: true },
   { to: '/cases', label: 'Revenue Cases', icon: 'cases' },

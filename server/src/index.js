@@ -10,7 +10,8 @@ const dashboardRouter = require('./routes/dashboardRoutes');
 const simulationRouter = require('./routes/simulationRoutes');
 const settingsRouter = require('./routes/settingsRoutes');
 // TEST HARNESS ONLY - see src/testHarness/testHarnessRouter.js. Not part of
-// the product's locked core loop.
+// the product's locked core loop. Only actually mounted when
+// ENABLE_TEST_HARNESS === 'true' (see below).
 const testHarnessRouter = require('./testHarness/testHarnessRouter');
 
 const app = express();
@@ -38,11 +39,20 @@ app.use('/api', dashboardRouter);
 app.use('/api', simulationRouter);
 app.use('/api', settingsRouter);
 
-// TEST HARNESS ONLY - not part of product architecture. Scoped to public/ so
-// only files intentionally placed there are ever served (never .env, never
-// the service account key sitting elsewhere in server/).
-app.use(express.static(path.join(__dirname, '..', 'public')));
-app.use('/test-harness', testHarnessRouter);
+// TEST HARNESS ONLY - not part of product architecture, and gated behind an
+// explicit opt-in flag. ENABLE_TEST_HARNESS must be exactly 'true' for the
+// Custom Checkout test harness (POST /test-harness/create-order) and its static
+// page (/test-harness.html) to be mounted at all. In a real deployment this
+// flag is unset, so both stay unmounted/disabled by default - the product's
+// customer-facing surface only ever creates Payment Links, never Custom
+// Checkout. The static mount is scoped to public/ so only files intentionally
+// placed there are ever served (never .env, never the service account key
+// sitting elsewhere in server/).
+if (process.env.ENABLE_TEST_HARNESS === 'true') {
+  app.use(express.static(path.join(__dirname, '..', 'public')));
+  app.use('/test-harness', testHarnessRouter);
+  console.log('Test harness ENABLED (ENABLE_TEST_HARNESS=true) - dev/demo only, not for production');
+}
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', service: 'halt-line-server' });
