@@ -1,5 +1,5 @@
-const db = require('../config/firebase');
-const { logAuditEvent } = require('../services/auditLog');
+const defaultDb = require('../config/firebase');
+const { logAuditEvent: defaultLogAuditEvent } = require('../services/auditLog');
 
 // Pure rules only - this engine makes zero LLM calls. It independently
 // evaluates the AI's proposal and can veto it; see rule 6 below for the
@@ -16,7 +16,7 @@ function toDate(value) {
   return new Date(value);
 }
 
-async function getMatchingRevenueCaseIds(revenueCase) {
+async function getMatchingRevenueCaseIds(db, revenueCase) {
   const query = revenueCase.razorpayOrderId
     ? db.collection('revenue_cases').where('razorpayOrderId', '==', revenueCase.razorpayOrderId)
     : db.collection('revenue_cases').where('customerContact', '==', revenueCase.customerContact);
@@ -24,14 +24,14 @@ async function getMatchingRevenueCaseIds(revenueCase) {
   return snap.docs.map((doc) => doc.id);
 }
 
-async function countRecoveryAttemptsForCaseIds(caseIds) {
+async function countRecoveryAttemptsForCaseIds(db, caseIds) {
   if (caseIds.length === 0) return 0;
   // Firestore 'in' caps at 30 values - well beyond this project's scope.
   const snap = await db.collection('recovery_attempts').where('caseId', 'in', caseIds.slice(0, 30)).get();
   return snap.size;
 }
 
-async function findActiveUnexpiredLink(revenueCase, now) {
+async function findActiveUnexpiredLink(db, revenueCase, now) {
   const query = revenueCase.razorpayOrderId
     ? db
         .collection('recovery_attempts')
@@ -50,7 +50,7 @@ async function findActiveUnexpiredLink(revenueCase, now) {
   });
 }
 
-async function findRecentContactAttempt(revenueCase, now) {
+async function findRecentContactAttempt(db, revenueCase, now) {
   const snap = await db
     .collection('recovery_attempts')
     .where('customerContact', '==', revenueCase.customerContact)
@@ -62,7 +62,13 @@ async function findRecentContactAttempt(revenueCase, now) {
   });
 }
 
-async function evaluateProposal(revenueCase, aiProposal) {
+// The `db` and `logAuditEvent` collaborators are injectable via the third
+// argument purely for unit testing (see evaluateProposal.test.js); in
+// production the caller passes nothing and the real Firestore client /
+// audit logger are used. The rule evaluation below is unchanged by this -
+// same rules, same order, same short-circuit behavior.
+async function evaluateProposal(revenueCase, aiProposal, deps = {}) {
+  const { db = defaultDb, logAuditEvent = defaultLogAuditEvent } = deps;
   const now = new Date();
   const rulesApplied = [];
   let decision;
@@ -76,8 +82,8 @@ async function evaluateProposal(revenueCase, aiProposal) {
   }
 
   if (!decision) {
-    const caseIds = await getMatchingRevenueCaseIds(revenueCase);
-    const attemptCount = await countRecoveryAttemptsForCaseIds(caseIds);
+    const caseIds = await getMatchingRevenueCaseIds(db, revenueCase);
+    const attemptCount = await countRecoveryAttemptsForCaseIds(db, caseIds);
     const maxAttemptsExceeded = attemptCount >= MAX_ATTEMPTS_LIMIT;
     rulesApplied.push({ rule: 2, name: 'MAX_ATTEMPTS', triggered: maxAttemptsExceeded });
     if (maxAttemptsExceeded) {
@@ -87,7 +93,7 @@ async function evaluateProposal(revenueCase, aiProposal) {
   }
 
   if (!decision) {
-    const activeLinkExists = await findActiveUnexpiredLink(revenueCase, now);
+    const activeLinkExists = await findActiveUnexpiredLink(db, revenueCase, now);
     rulesApplied.push({ rule: 3, name: 'ACTIVE_LINK_EXISTS', triggered: activeLinkExists });
     if (activeLinkExists) {
       decision = 'VETO';
@@ -96,7 +102,7 @@ async function evaluateProposal(revenueCase, aiProposal) {
   }
 
   if (!decision) {
-    const frequencyCapExceeded = await findRecentContactAttempt(revenueCase, now);
+    const frequencyCapExceeded = await findRecentContactAttempt(db, revenueCase, now);
     rulesApplied.push({ rule: 4, name: 'CONTACT_FREQUENCY_CAP', triggered: frequencyCapExceeded });
     if (frequencyCapExceeded) {
       decision = 'VETO';
