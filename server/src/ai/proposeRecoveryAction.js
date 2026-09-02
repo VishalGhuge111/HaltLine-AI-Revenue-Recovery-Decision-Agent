@@ -7,6 +7,22 @@ const { logAuditEvent } = require('../services/auditLog');
 
 const MODEL = 'claude-opus-5';
 
+// Hard ceiling on the Anthropic call. LLM calls in this codebase have taken up
+// to ~10s in real testing, so 15s gives headroom without letting a network
+// stall or an API outage hang the recovery pipeline (and the case) forever.
+const AI_PROPOSAL_TIMEOUT_MS = 15000;
+
+// Promise.race the API call against a timer. The underlying fetch is not
+// aborted, but the pipeline stops waiting on it and the case gets a fail-safe
+// policy decision instead of sitting Pending indefinitely.
+function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`AI proposal timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 const ProposalSchema = z.object({
   classification: z.enum(['RETRIABLE', 'NON_RETRIABLE', 'UNCERTAIN']),
   confidence: z.number().min(0).max(1),
@@ -85,13 +101,16 @@ async function proposeRecoveryAction(revenueCase) {
 
   let response;
   try {
-    response = await anthropic.messages.parse({
-      model: MODEL,
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: buildUserPrompt(revenueCase) }],
-      output_config: { format: zodOutputFormat(ProposalSchema) },
-    });
+    response = await withTimeout(
+      anthropic.messages.parse({
+        model: MODEL,
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: buildUserPrompt(revenueCase) }],
+        output_config: { format: zodOutputFormat(ProposalSchema) },
+      }),
+      AI_PROPOSAL_TIMEOUT_MS,
+    );
   } catch (error) {
     await logAuditEvent(caseId, 'ai_proposal_failed', {
       error: error.message,

@@ -119,8 +119,27 @@ async function runRecoveryPipeline(revenueCase) {
   try {
     aiProposal = await proposeRecoveryAction(revenueCase);
   } catch (error) {
-    // proposeRecoveryAction already logs ai_proposal_failed or
-    // ai_proposal_wording_violation internally before throwing - stop here.
+    // proposeRecoveryAction already logged the specific failure (timeout,
+    // API error, wording violation, ...) internally. There's no real AI
+    // proposal to run through evaluateProposal, but the case must still
+    // reach a terminal decision rather than sitting Pending forever - so
+    // synthesize the fail-safe policy decision directly: always ESCALATE
+    // to a human, never a silent stop and never an auto-APPROVE.
+    const failSafeDecision = {
+      decision: 'ESCALATE',
+      reasonCode: 'AI_PROPOSAL_UNAVAILABLE',
+      evaluatedAt: new Date().toISOString(),
+      rulesApplied: [],
+    };
+    await db.collection('policy_decisions').doc(revenueCase.caseId).set(failSafeDecision);
+    await logAuditEvent(revenueCase.caseId, 'policy_decision_made', {
+      decision: failSafeDecision.decision,
+      reasonCode: failSafeDecision.reasonCode,
+    });
+    await logAuditEvent(revenueCase.caseId, 'case_finalized_no_action', {
+      decision: failSafeDecision.decision,
+      reasonCode: failSafeDecision.reasonCode,
+    });
     return;
   }
 
