@@ -11,11 +11,12 @@
 // page is not meant to ship enabled. The note at the bottom of the page states
 // the same thing for anyone viewing it in the UI.
 import { useEffect, useRef, useState } from 'react';
+import { PAGE } from '../pageStyle';
 import { Link } from 'react-router-dom';
 import { fetchCases, fetchCaseDetail } from '../api';
 import { PageHeader } from '../components/PageHeader';
 import { ClassificationBadge, DecisionBadge } from '../components/StatusBadge';
-import { formatAmount, formatDateTime, shortenId, AI_ACTION_LABELS } from '../format';
+import { formatAmount, formatDateTime, AI_ACTION_LABELS } from '../format';
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_CHECKS = 10; // 10 * 3s = 30s
@@ -35,7 +36,9 @@ function loadRazorpayScript() {
 }
 
 export function LiveDemo() {
-  const [amount, setAmount] = useState(100);
+  // Rupee-denominated for humans. The test-harness endpoint still expects paise
+  // (Razorpay's convention) - we convert on the way out, in handleCreateOrder.
+  const [amount, setAmount] = useState('1.00');
   const [creating, setCreating] = useState(false);
   const [order, setOrder] = useState(null);
   const [error, setError] = useState(null);
@@ -97,10 +100,12 @@ export function LiveDemo() {
     setCreating(true);
     setOrder(null);
     try {
+      // Convert rupees -> paise right before the call; backend contract is unchanged.
+      const paise = Math.max(1, Math.round((Number(amount) || 1) * 100));
       const res = await fetch('/test-harness/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: Number(amount) || 100, currency: 'INR' }),
+        body: JSON.stringify({ amount: paise, currency: 'INR' }),
       });
 
       if (!res.ok) {
@@ -144,10 +149,10 @@ export function LiveDemo() {
   }
 
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 32px 80px' }}>
+    <div style={PAGE}>
       <PageHeader
         title="Live Demo"
-        description="Trigger a real Razorpay Test Mode payment failure and watch it flow through the full pipeline live: classify -> AI propose -> policy decide -> execute (if approved)."
+        description="Trigger a real Razorpay Test Mode payment failure and watch it flow through the full pipeline live: classify → AI propose → policy decide → execute (if approved)."
       />
 
       <div
@@ -163,11 +168,12 @@ export function LiveDemo() {
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Amount (paise)
+              Amount (₹)
             </span>
             <input
               type="number"
-              min="1"
+              min="0.01"
+              step="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               style={{
@@ -303,8 +309,8 @@ export function LiveDemo() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
               <div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-tertiary)' }}>
-                  {shortenId(latestCase.caseId)}
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: 'var(--text-tertiary)', wordBreak: 'break-all' }}>
+                  {latestCase.caseId}
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2 }}>
                   {formatAmount(latestCase.amount, latestCase.currency)}

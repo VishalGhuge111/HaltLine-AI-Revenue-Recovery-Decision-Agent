@@ -47,7 +47,7 @@ function ActorBadge({ actor }) {
         color: style.color,
         background: style.bg,
         border: `1px solid ${style.border}`,
-        borderRadius: 999,
+        borderRadius: 'var(--radius-sm)',
         padding: '1px 7px',
       }}
     >

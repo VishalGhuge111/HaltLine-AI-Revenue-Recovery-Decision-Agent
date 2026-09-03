@@ -25,6 +25,20 @@ export function formatDateTime(isoString) {
   });
 }
 
+// Compact form for dense table cells: "04 Sep, 10:30 pm" (no year, no seconds).
+// Full formatDateTime stays for detail views.
+export function formatDateShort(isoString) {
+  if (!isoString) return '—';
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function formatRelative(isoString) {
   if (!isoString) return '—';
   const date = new Date(isoString);

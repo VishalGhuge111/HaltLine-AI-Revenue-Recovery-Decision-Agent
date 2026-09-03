@@ -1,4 +1,5 @@
 import { PageHeader } from '../components/PageHeader';
+import { PAGE } from '../pageStyle';
 import { DecisionBadge } from '../components/StatusBadge';
 import { RULE_LABELS } from '../components/RulesChecklist';
 
@@ -157,7 +158,7 @@ function RuleCard({ rule }) {
 
 export function Policies() {
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 32px 80px' }}>
+    <div style={PAGE}>
       <PageHeader
         title="Policies"
         description="The deterministic rules that make the final call on every case."

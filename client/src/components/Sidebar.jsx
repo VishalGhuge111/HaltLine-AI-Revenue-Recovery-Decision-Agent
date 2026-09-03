@@ -1,6 +1,11 @@
 import { NavLink } from 'react-router-dom';
+import { NAV_SECTIONS } from '../nav';
 
 export const SIDEBAR_WIDTH = 240;
+// The gray top strip. The logo block (sidebar width) and the top bar content
+// (remaining width) both live in a row of exactly this height, so they read as
+// one continuous strip.
+export const TOP_STRIP_HEIGHT = 56;
 
 function Icon({ children }) {
   return (
@@ -76,114 +81,197 @@ const ICONS = {
   ),
 };
 
-const NAV_ITEMS = [
-  // DEV/DEMO-ONLY. The Live Demo page drives Razorpay Custom Checkout via the
-  // backend test harness (mounted only when the server has ENABLE_TEST_HARNESS
-  // =true). It is not part of the product's real customer-facing surface - with
-  // the harness disabled the page only surfaces errors. Consider dropping this
-  // nav entry (and the /live-demo route) from any real deployment build.
-  { to: '/live-demo', label: 'Live Demo', icon: 'liveDemo' },
-  { to: '/', label: 'Overview', icon: 'overview', end: true },
-  { to: '/cases', label: 'Revenue Cases', icon: 'cases' },
-  { to: '/payment-links', label: 'Payment Links', icon: 'paymentLinks' },
-  { to: '/recoveries', label: 'Recoveries', icon: 'recoveries' },
-  { to: '/audit-trail', label: 'Audit Trail', icon: 'auditTrail' },
-  { to: '/simulations', label: 'Simulations', icon: 'simulations' },
-  { to: '/policies', label: 'Policies', icon: 'policies' },
-  { to: '/settings', label: 'Settings', icon: 'settings' },
-];
+// DEV/DEMO-ONLY: the "Live Demo" item (under OPERATE) drives Razorpay Custom
+// Checkout via the backend test harness (mounted only when the server has
+// ENABLE_TEST_HARNESS=true). Not part of the product's real customer-facing
+// surface - consider dropping it (and the /live-demo route) from a real
+// deployment build.
 
+// Brand mark + wordmark. Lives in the top strip, sized to the strip height so
+// it aligns with the top bar content on the same plane.
+export function SidebarLogo() {
+  return (
+    <div
+      style={{
+        width: SIDEBAR_WIDTH,
+        height: TOP_STRIP_HEIGHT,
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '0 20px',
+      }}
+    >
+      <span
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: 6,
+          background: 'var(--accent-policy)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#fff',
+          fontWeight: 700,
+          fontSize: 13,
+          flexShrink: 0,
+        }}
+      >
+        H
+      </span>
+      <span style={{ fontWeight: 700, fontSize: 15.5, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
+        Halt Line
+      </span>
+    </div>
+  );
+}
+
+function NavItem({ item }) {
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      style={({ isActive }) => ({
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 11,
+        padding: '8px 12px',
+        borderRadius: 'var(--radius-sm)',
+        fontSize: 13.5,
+        fontWeight: isActive ? 650 : 550,
+        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+        background: isActive ? 'var(--surface)' : 'transparent',
+        boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
+        textDecoration: 'none',
+        transition: 'background 120ms ease, color 120ms ease',
+      })}
+      onMouseEnter={(e) => {
+        if (!e.currentTarget.getAttribute('aria-current')) {
+          e.currentTarget.style.background = 'rgba(20,20,26,0.05)';
+          e.currentTarget.style.color = 'var(--text-primary)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!e.currentTarget.getAttribute('aria-current')) {
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.color = 'var(--text-secondary)';
+        }
+      }}
+    >
+      {({ isActive }) => (
+        <>
+          {isActive && (
+            <span
+              style={{
+                position: 'absolute',
+                left: -12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: 3,
+                height: 18,
+                borderRadius: '0 2px 2px 0',
+                background: 'var(--accent-indigo)',
+              }}
+            />
+          )}
+          {ICONS[item.icon]}
+          {item.label}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+// The nav column - sits below the top strip, same gray as the strip / backdrop
+// so sidebar + top bar read as one unified chrome zone.
 export function Sidebar() {
   return (
     <aside
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        bottom: 0,
         width: SIDEBAR_WIDTH,
-        background: '#0f1115',
-        color: '#e6e6ea',
+        flexShrink: 0,
+        background: 'var(--bg)',
         display: 'flex',
         flexDirection: 'column',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
-        zIndex: 10,
+        overflow: 'hidden',
       }}
     >
-      <div style={{ padding: '22px 20px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {/* Custom scrollbar is deliberately NOT applied here - it is scoped to the
+          content frame only. This column overflows only on very short viewports. */}
+      <nav style={{ flex: 1, padding: '10px 12px 16px', display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto' }}>
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.label} style={{ marginBottom: 8 }}>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.09em',
+                textTransform: 'uppercase',
+                color: 'var(--text-tertiary)',
+                padding: '8px 12px 6px',
+              }}
+            >
+              {section.label}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {section.items.map((item) => (
+                <NavItem key={item.to} item={item} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div style={{ padding: '12px 14px 14px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 11,
+            padding: '8px 10px',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+          }}
+        >
           <span
             style={{
-              width: 26,
-              height: 26,
-              borderRadius: 7,
-              background: '#fff',
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              background: 'var(--surface-sunken)',
+              border: '1px solid var(--border)',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#0f1115',
-              fontWeight: 700,
               fontSize: 13,
+              fontWeight: 700,
+              color: 'var(--text-primary)',
               flexShrink: 0,
             }}
           >
             H
           </span>
-          <span style={{ fontWeight: 700, fontSize: 15.5, letterSpacing: '-0.01em', color: '#fff' }}>Halt Line</span>
-        </div>
-        <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.4)', marginTop: 6, letterSpacing: '0.02em' }}>
-          AI Revenue Recovery
-        </div>
-      </div>
-
-      <nav style={{ flex: 1, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
-        {NAV_ITEMS.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: 11,
-              padding: '9px 12px',
-              borderRadius: 7,
-              fontSize: 13.5,
-              fontWeight: 600,
-              color: isActive ? '#fff' : 'rgba(255,255,255,0.55)',
-              background: isActive ? 'rgba(255,255,255,0.09)' : 'transparent',
-              textDecoration: 'none',
-              transition: 'background 120ms ease, color 120ms ease',
-            })}
-          >
-            {ICONS[item.icon]}
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-
-      <div style={{ padding: '14px 16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: '50%',
-              background: 'rgba(255,255,255,0.1)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 12,
-              fontWeight: 700,
-              color: '#fff',
-              flexShrink: 0,
-            }}
-          >
-            S
-          </span>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>Solo Builder</div>
-            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.4)' }}>Test Mode</div>
+          <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 650, color: 'var(--text-primary)', letterSpacing: '-0.01em', lineHeight: 1 }}>
+              Halt Line
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent-indigo)', flexShrink: 0 }} />
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: '0.09em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-tertiary)',
+                  lineHeight: 1,
+                }}
+              >
+                Demo Session
+              </span>
+            </div>
           </div>
         </div>
       </div>

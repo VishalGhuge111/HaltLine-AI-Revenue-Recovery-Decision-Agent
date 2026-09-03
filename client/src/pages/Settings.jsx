@@ -1,6 +1,65 @@
 import { useEffect, useState } from 'react';
+import { PAGE } from '../pageStyle';
 import { fetchSettings, saveSettings } from '../api';
 import { PageHeader } from '../components/PageHeader';
+
+const CARD = {
+  background: 'var(--surface)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-lg)',
+  boxShadow: 'var(--shadow-sm)',
+};
+
+function SectionLabel({ children, style }) {
+  return (
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.07em',
+        textTransform: 'uppercase',
+        color: 'var(--text-tertiary)',
+        margin: '0 0 12px',
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Static, informational - real facts already known to the frontend. No controls.
+function EnvironmentCard() {
+  const facts = [
+    { label: 'Product', value: 'Halt Line' },
+    { label: 'Mode', value: 'Razorpay Test Mode', accent: true },
+    { label: 'Recovery channel', value: 'Payment Links only' },
+    { label: 'Decision engine', value: 'Deterministic policy · 6 rules' },
+  ];
+  return (
+    <div style={{ ...CARD, padding: 24, marginBottom: 32 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px 32px' }}>
+        {facts.map((f) => (
+          <div key={f.label}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {f.label}
+            </div>
+            <div
+              style={{
+                fontSize: 13.5,
+                fontWeight: 600,
+                marginTop: 4,
+                color: f.accent ? 'var(--accent-indigo)' : 'var(--text-primary)',
+              }}
+            >
+              {f.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function Toggle({ checked, onChange }) {
   return (
@@ -83,7 +142,7 @@ export function Settings() {
   }
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 32px 80px' }}>
+    <div style={PAGE}>
       <PageHeader title="Settings" description="Demo and testing configuration for outgoing recovery emails." />
 
       {error && (
@@ -95,23 +154,19 @@ export function Settings() {
             border: '1px solid var(--veto-border)',
             color: 'var(--veto)',
             fontSize: 14,
-            marginBottom: 20,
+            marginBottom: 24,
           }}
         >
           {error}
         </div>
       )}
 
-      <div
-        style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-sm)',
-          padding: 24,
-          marginBottom: 16,
-        }}
-      >
+      <SectionLabel>Environment</SectionLabel>
+      <EnvironmentCard />
+
+      <SectionLabel>Email notifications</SectionLabel>
+
+      <div style={{ ...CARD, padding: 24, marginBottom: 16 }}>
         <label style={{ display: 'block', fontSize: 13.5, fontWeight: 700, marginBottom: 6 }}>
           Demo notification email
         </label>
@@ -135,16 +190,7 @@ export function Settings() {
         />
       </div>
 
-      <div
-        style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-sm)',
-          padding: 24,
-          marginBottom: 24,
-        }}
-      >
+      <div style={{ ...CARD, padding: 24, marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div>
             <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 6 }}>Auto-send email on APPROVE</div>

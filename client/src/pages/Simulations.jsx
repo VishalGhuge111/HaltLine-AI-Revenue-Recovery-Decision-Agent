@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PAGE } from '../pageStyle';
 import { runSimulation, fetchSimulations } from '../api';
 import { Panel } from '../components/Panel';
 import { formatAmount, formatDateTime } from '../format';
@@ -147,7 +148,7 @@ export function Simulations() {
   }
 
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 32px 80px' }}>
+    <div style={PAGE}>
       <div
         style={{
           display: 'flex',
@@ -169,7 +170,7 @@ export function Simulations() {
                 color: 'var(--escalate)',
                 background: 'var(--escalate-bg)',
                 border: '1px solid var(--escalate-border)',
-                borderRadius: 999,
+                borderRadius: 'var(--radius-sm)',
                 padding: '2px 10px',
               }}
             >

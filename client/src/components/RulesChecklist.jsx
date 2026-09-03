@@ -61,7 +61,7 @@ export function RulesChecklist({ rules }) {
                       color: 'var(--accent-policy)',
                       background: 'var(--accent-policy-bg)',
                       border: '1px solid var(--accent-policy-border)',
-                      borderRadius: 999,
+                      borderRadius: 'var(--radius-sm)',
                       padding: '1px 7px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.03em',

@@ -11,18 +11,23 @@
   --sp-6: 48px;
   --sp-7: 64px;
 
+  --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
 
   --shadow-sm: 0 1px 2px rgba(15, 15, 20, 0.04);
   --shadow-md: 0 1px 3px rgba(15, 15, 20, 0.06), 0 4px 12px rgba(15, 15, 20, 0.04);
 
-  /* neutral base palette */
-  --bg: #fafafa;
+  /* neutral base palette
+     --bg is the backdrop BEHIND the routed content panel (visible in the
+     gutters around it); --surface is the white content panel + cards. Kept
+     clearly distinct so the shell doesn't read flat. */
+  --bg: #eceef1;
   --surface: #ffffff;
-  --surface-sunken: #f6f6f7;
-  --border: #e7e7ea;
-  --border-strong: #d8d8dd;
+  --surface-sunken: #f5f6f7;
+  --border: #e6e6ea;
+  --border-strong: #d6d6dc;
+  --panel-radius: 16px;
   --text-primary: #17171a;
   --text-secondary: #6b6b74;
   --text-tertiary: #9c9ca5;
@@ -52,6 +57,11 @@
   --accent-policy-bg: #f1f4f9;
   --accent-policy-border: #dbe2ec;
 
+  /* indigo: neutral "mode indicator" accent (NOT a warning, unlike amber) */
+  --accent-indigo: #4338ca;
+  --accent-indigo-bg: #eef1fe;
+  --accent-indigo-border: #c9cef4;
+
   /* human-in-the-loop: the third kind of actor (AI proposes, policy decides,
      human is the final word on ESCALATE cases) - visually distinct from both
      the purple AI accent and the near-black policy accent */
@@ -62,6 +72,53 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* skeleton loading placeholder - shimmer sweep */
+@keyframes hl-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.hl-skeleton {
+  background-image: linear-gradient(
+    90deg,
+    var(--surface-sunken) 25%,
+    #ededf0 37%,
+    var(--surface-sunken) 63%
+  );
+  background-size: 200% 100%;
+  animation: hl-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hl-skeleton {
+    animation: none;
+  }
+}
+
+/* Slim custom scrollbar - applied ONLY to the inner scroll div inside the white
+   content frame. Never the document, never the sidebar, never the frame itself
+   (so the frame's border / shadow / rounded corners stay static and visible). */
+.hl-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.hl-scroll::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+.hl-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.hl-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 3px solid var(--surface);
+}
+.hl-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
 }
 
 html,

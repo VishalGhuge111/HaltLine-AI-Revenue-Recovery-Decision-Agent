@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PAGE } from '../pageStyle';
 import { Link, useParams } from 'react-router-dom';
 import { fetchCaseDetail, sendCaseEmail, resolveEscalation } from '../api';
 import { DecisionBadge, ClassificationBadge, RecoveryStatusBadge } from '../components/StatusBadge';
@@ -7,6 +8,8 @@ import { RulesChecklist, RULE_LABELS } from '../components/RulesChecklist';
 import { AuditTimeline } from '../components/AuditTimeline';
 import { HumanReview } from '../components/HumanReview';
 import { Panel } from '../components/Panel';
+import { ExternalLink } from '../components/ExternalLink';
+import { SkeletonBlock } from '../components/Skeleton';
 import { formatAmount, formatDateTime, formatSnakeCase, AI_ACTION_LABELS } from '../format';
 
 function impliesAgreement(aiAction, decision) {
@@ -106,7 +109,7 @@ export function CaseDetail() {
 
   if (error) {
     return (
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 32px' }}>
+      <div style={PAGE}>
         <BackLink />
         <div
           style={{
@@ -126,12 +129,7 @@ export function CaseDetail() {
   }
 
   if (!data) {
-    return (
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 32px' }}>
-        <BackLink />
-        <div style={{ fontSize: 14, color: 'var(--text-secondary)', padding: '32px 0' }}>Loading case…</div>
-      </div>
-    );
+    return <CaseDetailSkeleton />;
   }
 
   const { case: c, aiProposal, policyDecision, recoveryAttempts, auditTrail } = data;
@@ -144,7 +142,7 @@ export function CaseDetail() {
   const humanApproved = humanResolved && policyDecision.reasonCode === 'HUMAN_APPROVED_ESCALATION';
 
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto', padding: '32px 32px 80px' }}>
+    <div style={PAGE}>
       <BackLink />
 
       {/* Case header */}
@@ -396,24 +394,7 @@ export function CaseDetail() {
                     Created {formatDateTime(attempt.createdAt)}
                     {attempt.paidAt ? ` · Paid ${formatDateTime(attempt.paidAt)}` : ''}
                   </span>
-                  {attempt.shortUrl && (
-                    <a
-                      href={attempt.shortUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: 'var(--accent-policy)',
-                        border: '1px solid var(--border-strong)',
-                        borderRadius: 'var(--radius-md)',
-                        padding: '6px 12px',
-                        background: 'var(--surface-sunken)',
-                      }}
-                    >
-                      Open payment link ↗
-                    </a>
-                  )}
+                  {attempt.shortUrl && <ExternalLink href={attempt.shortUrl}>Open payment link</ExternalLink>}
                 </div>
               </div>
             );
@@ -452,6 +433,62 @@ function Field({ label, value }) {
     <div>
       <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 13.5, fontWeight: 500 }}>{value}</div>
+    </div>
+  );
+}
+
+const SKELETON_CARD = {
+  background: 'var(--surface)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-lg)',
+  boxShadow: 'var(--shadow-sm)',
+  padding: 24,
+};
+
+function CaseDetailSkeleton() {
+  return (
+    <div style={PAGE}>
+      <BackLink />
+
+      <div style={{ ...SKELETON_CARD, marginTop: 16, marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <SkeletonBlock width={220} height={12} />
+            <SkeletonBlock width={140} height={28} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <SkeletonBlock width={92} height={22} />
+            <SkeletonBlock width={80} height={22} />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 24 }}>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <SkeletonBlock width={70} height={10} />
+              <SkeletonBlock width="80%" height={14} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+        {[0, 1].map((col) => (
+          <div key={col} style={{ ...SKELETON_CARD, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <SkeletonBlock width={110} height={11} />
+            <SkeletonBlock width="60%" height={18} />
+            <SkeletonBlock width="100%" height={12} />
+            <SkeletonBlock width="100%" height={12} />
+            <SkeletonBlock width="75%" height={12} />
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...SKELETON_CARD, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <SkeletonBlock width={120} height={11} />
+        {[0, 1, 2, 3].map((i) => (
+          <SkeletonBlock key={i} width="100%" height={14} />
+        ))}
+      </div>
     </div>
   );
 }
