@@ -54,3 +54,14 @@ export function saveSettings(partial) {
 export function sendCaseEmail(caseId) {
   return request(`/cases/${encodeURIComponent(caseId)}/send-email`, { method: 'POST' });
 }
+
+// action: "approve" | "reject". Only valid on a case whose current policy
+// decision is ESCALATE and hasn't been resolved yet. Resolves to the refreshed
+// case-detail payload (same shape as fetchCaseDetail).
+export function resolveEscalation(caseId, action) {
+  return request(`/cases/${encodeURIComponent(caseId)}/resolve-escalation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action }),
+  });
+}

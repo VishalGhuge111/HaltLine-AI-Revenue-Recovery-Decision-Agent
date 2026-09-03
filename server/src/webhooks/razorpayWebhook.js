@@ -1,20 +1,16 @@
 const express = require('express');
 const crypto = require('crypto');
-const { FieldValue, Timestamp } = require('firebase-admin/firestore');
+const { FieldValue } = require('firebase-admin/firestore');
 const db = require('../config/firebase');
-const razorpay = require('../config/razorpay');
 const { createRevenueCase } = require('../models/RevenueCase');
 const { logAuditEvent } = require('../services/auditLog');
 const { proposeRecoveryAction } = require('../ai/proposeRecoveryAction');
 const { evaluateProposal } = require('../policy/evaluateProposal');
-const { getSettings } = require('../config/settings');
-const { sendRecoveryEmail } = require('../services/sendRecoveryEmail');
+const { executeApprovedRecovery } = require('../services/executeApprovedRecovery');
 
 const router = express.Router();
 
 const { RAZORPAY_WEBHOOK_SECRET } = process.env;
-
-const RECOVERY_LINK_VALIDITY_SECONDS = 48 * 60 * 60;
 
 // Razorpay webhook events have no top-level "id" (verified against real
 // payload shape at https://razorpay.com/docs/webhooks/payloads/payments/).
@@ -54,61 +50,10 @@ async function checkAndMarkProcessed(eventId, eventType) {
   });
 }
 
-// Creates the real Razorpay Payment Link for an APPROVE decision, writes the
-// recovery_attempts tracking doc, and logs each step. Never throws - a
-// downstream Razorpay failure here is logged as payment_link_creation_failed
-// rather than crashing the webhook response.
-async function executeApprovedRecovery(revenueCase, aiProposal) {
-  const expireBy = Math.floor(Date.now() / 1000) + RECOVERY_LINK_VALIDITY_SECONDS;
-
-  let paymentLink;
-  try {
-    paymentLink = await razorpay.paymentLink.create({
-      amount: revenueCase.amount,
-      currency: revenueCase.currency,
-      description: `Recover the outstanding revenue for payment ${revenueCase.razorpayPaymentId}`,
-      customer: {
-        contact: revenueCase.customerContact,
-        email: revenueCase.customerEmail,
-      },
-      notify: { sms: false, email: false },
-      expire_by: expireBy,
-    });
-  } catch (error) {
-    const message = error.error?.description || error.message || 'Unknown Razorpay error';
-    await logAuditEvent(revenueCase.caseId, 'payment_link_creation_failed', { error: message });
-    return;
-  }
-
-  await logAuditEvent(revenueCase.caseId, 'payment_link_created', {
-    paymentLinkId: paymentLink.id,
-    shortUrl: paymentLink.short_url,
-  });
-
-  const settings = await getSettings();
-  if (settings.autoSendEmail) {
-    try {
-      await sendRecoveryEmail(revenueCase, aiProposal, paymentLink.short_url);
-    } catch (error) {
-      // sendRecoveryEmail already logs recovery_email_failed to audit_trail;
-      // an email failure must never break the webhook response.
-    }
-  }
-
-  await db
-    .collection('recovery_attempts')
-    .doc(paymentLink.id)
-    .set({
-      caseId: revenueCase.caseId,
-      customerContact: revenueCase.customerContact,
-      razorpayOrderId: revenueCase.razorpayOrderId || null,
-      paymentLinkId: paymentLink.id,
-      shortUrl: paymentLink.short_url,
-      createdAt: FieldValue.serverTimestamp(),
-      expiresAt: Timestamp.fromMillis(expireBy * 1000),
-      status: 'active',
-    });
-}
+// The "act on an APPROVE decision" logic (create Razorpay Payment Link, write
+// recovery_attempts, auto-send email) lives in ../services/executeApprovedRecovery
+// so this automatic path and the manual human-approves-an-escalation path share
+// one implementation.
 
 // AI propose -> policy decide -> act (or don't). Always resolves - every
 // failure branch is logged to audit_trail rather than thrown, since the

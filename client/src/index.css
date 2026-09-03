@@ -51,6 +51,13 @@
   --accent-policy: #0f172a;
   --accent-policy-bg: #f1f4f9;
   --accent-policy-border: #dbe2ec;
+
+  /* human-in-the-loop: the third kind of actor (AI proposes, policy decides,
+     human is the final word on ESCALATE cases) - visually distinct from both
+     the purple AI accent and the near-black policy accent */
+  --accent-human: #0e7490;
+  --accent-human-bg: #ecfdff;
+  --accent-human-border: #bae6ec;
 }
 
 * {

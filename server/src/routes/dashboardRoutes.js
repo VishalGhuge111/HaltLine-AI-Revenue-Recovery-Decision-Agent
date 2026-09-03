@@ -1,6 +1,8 @@
 const express = require('express');
 const db = require('../config/firebase');
 const { sendRecoveryEmail } = require('../services/sendRecoveryEmail');
+const { executeApprovedRecovery } = require('../services/executeApprovedRecovery');
+const { logAuditEvent } = require('../services/auditLog');
 
 const router = express.Router();
 
@@ -45,63 +47,176 @@ router.get('/cases', async (req, res) => {
   }
 });
 
+// Assembles the full case-detail payload (case + proposal + decision + attempts
+// + audit trail). Shared by GET /cases/:caseId and the resolve-escalation
+// endpoint, which returns the refreshed state after a human resolution.
+// Returns null if the case doesn't exist.
+async function assembleCaseDetail(caseId) {
+  const caseDoc = await db.collection('revenue_cases').doc(caseId).get();
+  if (!caseDoc.exists) {
+    return null;
+  }
+
+  const [proposalDoc, decisionDoc, recoveryAttemptsSnap, auditSnap] = await Promise.all([
+    db.collection('ai_proposals').doc(caseId).get(),
+    db.collection('policy_decisions').doc(caseId).get(),
+    db.collection('recovery_attempts').where('caseId', '==', caseId).get(),
+    db.collection('audit_trail').where('caseId', '==', caseId).get(),
+  ]);
+
+  const caseData = caseDoc.data();
+
+  return {
+    case: {
+      caseId: caseDoc.id,
+      razorpayPaymentId: caseData.razorpayPaymentId,
+      razorpayOrderId: caseData.razorpayOrderId,
+      amount: caseData.amount,
+      currency: caseData.currency,
+      customerContact: caseData.customerContact,
+      customerEmail: caseData.customerEmail,
+      errorCode: caseData.errorCode,
+      errorDescription: caseData.errorDescription,
+      errorSource: caseData.errorSource,
+      errorReason: caseData.errorReason,
+      errorStep: caseData.errorStep,
+      classification: caseData.classification,
+      createdAt: toIso(caseData.createdAt),
+    },
+    aiProposal: proposalDoc.exists
+      ? { ...proposalDoc.data(), createdAt: toIso(proposalDoc.data().createdAt) }
+      : null,
+    policyDecision: decisionDoc.exists ? decisionDoc.data() : null,
+    recoveryAttempts: recoveryAttemptsSnap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        ...data,
+        paymentLinkId: doc.id,
+        createdAt: toIso(data.createdAt),
+        expiresAt: toIso(data.expiresAt),
+        paidAt: toIso(data.paidAt),
+      };
+    }),
+    auditTrail: auditSnap.docs
+      .map((doc) => {
+        const data = doc.data();
+        return { ...data, timestamp: toIso(data.timestamp) };
+      })
+      .sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || '')),
+  };
+}
+
 router.get('/cases/:caseId', async (req, res) => {
   try {
-    const { caseId } = req.params;
+    const detail = await assembleCaseDetail(req.params.caseId);
+    if (!detail) {
+      return res.status(404).json({ status: 'error', message: 'Case not found' });
+    }
+    res.status(200).json({ status: 'ok', ...detail });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
 
-    const caseDoc = await db.collection('revenue_cases').doc(caseId).get();
+// Manual human resolution of an ESCALATED case. AI proposes, the policy engine
+// decides automatically, and for ESCALATE cases specifically a human is the
+// final word - this endpoint is that step. It only ever runs AFTER the pipeline
+// has already produced an ESCALATE decision; it does not re-run classification,
+// the AI proposal, or the policy engine.
+//   body: { action: "approve" | "reject" }
+router.post('/cases/:caseId/resolve-escalation', async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    const action = req.body?.action;
+
+    if (action !== 'approve' && action !== 'reject') {
+      return res
+        .status(400)
+        .json({ status: 'error', message: 'Body must include action: "approve" or "reject"' });
+    }
+
+    const [caseDoc, proposalDoc, decisionDoc] = await Promise.all([
+      db.collection('revenue_cases').doc(caseId).get(),
+      db.collection('ai_proposals').doc(caseId).get(),
+      db.collection('policy_decisions').doc(caseId).get(),
+    ]);
+
     if (!caseDoc.exists) {
       return res.status(404).json({ status: 'error', message: 'Case not found' });
     }
 
-    const [proposalDoc, decisionDoc, recoveryAttemptsSnap, auditSnap] = await Promise.all([
-      db.collection('ai_proposals').doc(caseId).get(),
-      db.collection('policy_decisions').doc(caseId).get(),
-      db.collection('recovery_attempts').where('caseId', '==', caseId).get(),
-      db.collection('audit_trail').where('caseId', '==', caseId).get(),
-    ]);
+    const existingDecision = decisionDoc.exists ? decisionDoc.data() : null;
 
-    const caseData = caseDoc.data();
+    // Guard: only escalated, not-yet-resolved cases can be resolved here.
+    if (!existingDecision || existingDecision.decision !== 'ESCALATE') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'This case is not currently ESCALATE - the resolve-escalation action does not apply to it',
+      });
+    }
+    if (existingDecision.resolvedAt) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'This escalation has already been resolved',
+      });
+    }
 
-    res.status(200).json({
-      status: 'ok',
-      case: {
-        caseId: caseDoc.id,
-        razorpayPaymentId: caseData.razorpayPaymentId,
-        razorpayOrderId: caseData.razorpayOrderId,
-        amount: caseData.amount,
-        currency: caseData.currency,
-        customerContact: caseData.customerContact,
-        customerEmail: caseData.customerEmail,
-        errorCode: caseData.errorCode,
-        errorDescription: caseData.errorDescription,
-        errorSource: caseData.errorSource,
-        errorReason: caseData.errorReason,
-        errorStep: caseData.errorStep,
-        classification: caseData.classification,
-        createdAt: toIso(caseData.createdAt),
-      },
-      aiProposal: proposalDoc.exists
-        ? { ...proposalDoc.data(), createdAt: toIso(proposalDoc.data().createdAt) }
-        : null,
-      policyDecision: decisionDoc.exists ? decisionDoc.data() : null,
-      recoveryAttempts: recoveryAttemptsSnap.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          ...data,
-          paymentLinkId: doc.id,
-          createdAt: toIso(data.createdAt),
-          expiresAt: toIso(data.expiresAt),
-          paidAt: toIso(data.paidAt),
-        };
-      }),
-      auditTrail: auditSnap.docs
-        .map((doc) => {
-          const data = doc.data();
-          return { ...data, timestamp: toIso(data.timestamp) };
-        })
-        .sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || '')),
-    });
+    const revenueCase = caseDoc.data();
+    const aiProposal = proposalDoc.exists ? proposalDoc.data() : null;
+    const resolvedAt = new Date().toISOString();
+
+    if (action === 'approve') {
+      // Identical "act on APPROVE" path as the webhook's automatic APPROVE
+      // decision: create the Razorpay Payment Link, write recovery_attempts,
+      // and (if the auto-send setting is on) send the recovery email. That
+      // email step is handled inside executeApprovedRecovery, not duplicated
+      // here.
+      await executeApprovedRecovery(revenueCase, aiProposal);
+
+      await db
+        .collection('policy_decisions')
+        .doc(caseId)
+        .set({
+          ...existingDecision, // keep original evaluatedAt + rulesApplied
+          decision: 'APPROVE',
+          reasonCode: 'HUMAN_APPROVED_ESCALATION',
+          resolvedAt,
+          resolvedBy: 'human',
+        });
+
+      // Distinct step name from the machine-made "policy_decision_made" so the
+      // audit trail UI can render human decisions differently.
+      await logAuditEvent(caseId, 'human_decision_made', {
+        decision: 'APPROVE',
+        reasonCode: 'HUMAN_APPROVED_ESCALATION',
+        actor: 'human',
+      });
+    } else {
+      // reject: decision stays ESCALATE, but it's now a finalized, no-action case.
+      await db
+        .collection('policy_decisions')
+        .doc(caseId)
+        .set({
+          ...existingDecision,
+          resolvedAt,
+          resolvedBy: 'human',
+          resolutionAction: 'REJECTED',
+        });
+
+      await logAuditEvent(caseId, 'human_decision_made', {
+        decision: 'REJECTED',
+        reasonCode: 'HUMAN_REJECTED',
+        actor: 'human',
+      });
+      // Same terminal marker the webhook uses for VETO / DO_NOT_ACT / ESCALATE.
+      await logAuditEvent(caseId, 'case_finalized_no_action', {
+        decision: 'REJECTED',
+        reasonCode: 'HUMAN_REJECTED',
+      });
+    }
+
+    const detail = await assembleCaseDetail(caseId);
+    res.status(200).json({ status: 'ok', ...detail });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }

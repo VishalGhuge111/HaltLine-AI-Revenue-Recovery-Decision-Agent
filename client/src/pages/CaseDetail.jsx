@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { fetchCaseDetail, sendCaseEmail } from '../api';
+import { fetchCaseDetail, sendCaseEmail, resolveEscalation } from '../api';
 import { DecisionBadge, ClassificationBadge, RecoveryStatusBadge } from '../components/StatusBadge';
 import { ConfidenceMeter } from '../components/ConfidenceMeter';
 import { RulesChecklist, RULE_LABELS } from '../components/RulesChecklist';
 import { AuditTimeline } from '../components/AuditTimeline';
+import { HumanReview } from '../components/HumanReview';
 import { Panel } from '../components/Panel';
 import { formatAmount, formatDateTime, formatSnakeCase, AI_ACTION_LABELS } from '../format';
 
@@ -21,6 +22,10 @@ function impliesAgreement(aiAction, decision) {
 // are hard vetoes that fire without ever looking at what the AI proposed.
 function getComparison(aiProposal, policyDecision) {
   if (!aiProposal || !policyDecision) return null;
+  // Once a human has resolved an escalation, the decision on the doc no longer
+  // reflects a pure AI-vs-policy comparison - the human-review box tells that
+  // story instead.
+  if (policyDecision.resolvedBy === 'human') return null;
   const rules = policyDecision.rulesApplied || [];
   const decidingRule = rules[rules.length - 1];
   const consultedAi = decidingRule?.name === 'FINAL_CLASSIFICATION';
@@ -50,6 +55,8 @@ export function CaseDetail() {
   const [error, setError] = useState(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailResult, setEmailResult] = useState(null);
+  const [resolving, setResolving] = useState(null); // 'approve' | 'reject' | null
+  const [resolveError, setResolveError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +87,20 @@ export function CaseDetail() {
       setEmailResult({ type: 'error', message: err.message });
     } finally {
       setSendingEmail(false);
+    }
+  }
+
+  async function handleResolve(action) {
+    setResolving(action);
+    setResolveError(null);
+    try {
+      // Endpoint returns the refreshed case-detail payload - swap it straight in.
+      const updated = await resolveEscalation(caseId, action);
+      setData(updated);
+    } catch (err) {
+      setResolveError(err.message);
+    } finally {
+      setResolving(null);
     }
   }
 
@@ -115,6 +136,12 @@ export function CaseDetail() {
 
   const { case: c, aiProposal, policyDecision, recoveryAttempts, auditTrail } = data;
   const comparison = getComparison(aiProposal, policyDecision);
+
+  // Human-in-the-loop resolution state for ESCALATE cases.
+  const awaitingHumanReview =
+    policyDecision && policyDecision.decision === 'ESCALATE' && !policyDecision.resolvedAt;
+  const humanResolved = Boolean(policyDecision && policyDecision.resolvedAt && policyDecision.resolvedBy === 'human');
+  const humanApproved = humanResolved && policyDecision.reasonCode === 'HUMAN_APPROVED_ESCALATION';
 
   return (
     <div style={{ maxWidth: 1080, margin: '0 auto', padding: '32px 32px 80px' }}>
@@ -257,6 +284,17 @@ export function CaseDetail() {
                   </div>
                   <RulesChecklist rules={policyDecision.rulesApplied} />
                 </div>
+
+                {(awaitingHumanReview || humanResolved) && (
+                  <HumanReview
+                    awaiting={awaitingHumanReview}
+                    approved={humanApproved}
+                    resolvedAt={policyDecision.resolvedAt}
+                    resolving={resolving}
+                    error={resolveError}
+                    onResolve={handleResolve}
+                  />
+                )}
               </>
             ) : (
               <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
@@ -417,3 +455,4 @@ function Field({ label, value }) {
     </div>
   );
 }
+
