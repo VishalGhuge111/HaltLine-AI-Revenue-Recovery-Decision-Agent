@@ -11,6 +11,9 @@ deterministic policy engine that independently approves, vetoes, or escalates it
 The LLM has no execution authority; only the policy engine can cause a real
 Razorpay Payment Link to be created.
 
+For a deeper technical breakdown - data model, design rationale, failure
+modes, and the security model - see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 Built for the Razorpay AI Buildathon 2026, Track 03 (AI Revenue Recovery).
 
 - Repo: `https://github.com/VishalGhuge111/HaltLine-AI-Revenue-Recovery-Decision-Agent`
