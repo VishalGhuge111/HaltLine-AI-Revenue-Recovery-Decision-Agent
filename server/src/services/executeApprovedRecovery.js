@@ -46,11 +46,20 @@ async function executeApprovedRecovery(revenueCase, aiProposal) {
 
   const settings = await getSettings();
   if (settings.autoSendEmail) {
-    try {
-      await sendRecoveryEmail(revenueCase, aiProposal, paymentLink.short_url);
-    } catch (error) {
-      // sendRecoveryEmail already logs recovery_email_failed to audit_trail;
-      // an email failure must never break the caller.
+    if (!aiProposal) {
+      // Cases that escalated via AI_PROPOSAL_UNAVAILABLE have no AI-drafted
+      // message to send - there is nothing to email, so skip and log why
+      // rather than crashing on aiProposal.customer_message.
+      await logAuditEvent(revenueCase.caseId, 'recovery_email_skipped', {
+        reason: 'no AI proposal exists for this case',
+      });
+    } else {
+      try {
+        await sendRecoveryEmail(revenueCase, aiProposal, paymentLink.short_url);
+      } catch (error) {
+        // sendRecoveryEmail already logs recovery_email_failed to audit_trail;
+        // an email failure must never break the caller.
+      }
     }
   }
 
